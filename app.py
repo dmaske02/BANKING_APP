@@ -1,4 +1,3 @@
-
 import streamlit as st
 from Banking.account import SavingsAccount, CurrentAccount
 from Banking.transaction import deposit, withdraw
@@ -45,7 +44,8 @@ def login_ui():
 
         if acc_number in accounts:
             st.session_state.current_user = accounts[acc_number]
-            st.success(f"✅ Welcome, {accounts[acc_number].name}!")
+            st.session_state.welcome_message = f"✅ Welcome, {accounts[acc_number].name}!"
+            st.session_state.do_login_rerun = True
         else:
             st.error("❌ Invalid account number.")
 
@@ -60,38 +60,55 @@ def dashboard_ui():
 
     st.divider()
 
+    # Show one-time message (e.g. after deposit or withdraw)
+    if "action_message" in st.session_state:
+        msg = st.session_state.pop("action_message")
+        if msg.startswith("✅"):
+            st.success(msg)
+        elif msg.startswith("❌"):
+            st.error(msg)
+        else:
+            st.info(msg)
+    
     # Deposit
     deposit_amount = st.number_input("💵 Deposit Amount:", min_value=0.0, key="deposit")
     if st.button("Deposit"):
         deposit(user, deposit_amount)
-        st.success(f"✅ Deposited ₹{deposit_amount:.2f}")
-
+        st.session_state.action_message = f"✅ Deposited ₹{deposit_amount:.2f}"
+        st.rerun()
+        
     # Withdraw
     withdraw_amount = st.number_input("🏧 Withdraw Amount:", min_value=0.0, key="withdraw")
     if st.button("Withdraw"):
         if withdraw(user, withdraw_amount):
-            st.success(f"✅ Withdrawn ₹{withdraw_amount:.2f}")
+            st.session_state.action_message = f"✅ Withdrawn ₹{withdraw_amount:.2f}"
         else:
-            st.error("❌ Insufficient balance.")
-
-    # Interest Check
-    if isinstance(user, SavingsAccount):
-        if st.button("📈 Calculate Interest"):
-            interest = user.calculate_interest()
-            st.info(f"Interest earned: ₹{interest:.2f}")
+            st.session_state.action_message = "❌ Insufficient balance."
+        st.rerun()
 
     # Logout
     if st.button("🔒 Logout"):
         st.session_state.current_user = None
         st.success("Logged out successfully.")
+        st.rerun()
 
 
 # --- Main App ---
 def main():
+    # Handle one-time rerun after login
+    if st.session_state.get("do_login_rerun", False):
+        st.session_state.pop("do_login_rerun")
+        st.rerun()
+
     st.set_page_config(page_title="SIT Bank", page_icon="🏦", layout="centered")
     st.title("🏦 Welcome to SIT Bank")
     st.caption("Nagpur Branch | Simple Banking with Streamlit")
 
+    # Display persistent welcome message after login
+    if "welcome_message" in st.session_state:
+        st.success(st.session_state["welcome_message"])
+
+    # Route to dashboard or login/create account
     if st.session_state.current_user:
         dashboard_ui()
     else:
